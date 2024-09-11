@@ -1,10 +1,20 @@
 #!/bin/bash
+
 file1="/data/whisper_cpp/whisper_output.txt"
 file2="/data/llama_cpp/build/bin/llama_output.txt"
 
-cd whisper_cpp/
+# Define a cleanup function to be triggered upon interrupt
+cleanup() {
+  kill $PID 
+  wait $PID
+}
+
 export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/data/whisper_cpp:/data/llama_cpp/build/src:/data/llama_cpp/build/ggml/src:/data/piper_arm64/
-timeout 4s ./stream -m models/ggml-tiny.en.bin --step 4000 --length 4000 -c 0 -t 4 -ac 512 | tee whisper_output.txt
+cd whisper_cpp/
+trap cleanup SIGINT
+./stream -m models/ggml-tiny.en.bin --step 4000 --length 4000 -c 0 -t 4 -ac 512 | tee whisper_output.txt &
+PID=$!
+wait $PID
 tail -c +$((127 + 2)) "$file1" > temp_file && mv temp_file "$file1"
 char_count=$(wc -m < "$file1")
 cd ../llama_cpp/build/bin/
